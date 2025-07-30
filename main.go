@@ -1,8 +1,6 @@
 package main
 
 import (
-	"os"
-
 	"github.com/jhamiltonjunior/rinha-de-backend/app/database"
 	"github.com/jhamiltonjunior/rinha-de-backend/app/server"
 	"github.com/jhamiltonjunior/rinha-de-backend/app/worker"
@@ -10,19 +8,14 @@ import (
 )
 
 func main() {
-	client := database.InitializeMongoDB()
-	clientRedis := database.InitializeRedis()
+	db := database.InitializePostgresDB()
+	defer db.Close()
 
-	worker.InitializeWorker(client, clientRedis)
-
-	appPort := os.Getenv("APP_PORT")
-	if appPort == "" {
-		appPort = "3000"
-	}
+	worker.InitializeWorker(db)
 
 	// go pingQuantityOfSegureOChann()
 
-	server.ListenAndServe(appPort)
+	server.ListenAndServe("3000")
 }
 
 // func pingQuantityOfSegureOChann() {

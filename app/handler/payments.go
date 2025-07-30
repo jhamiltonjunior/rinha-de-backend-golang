@@ -42,6 +42,7 @@ func Payments(ctx *fasthttp.RequestCtx) {
 }
 
 func PaymentsSummary(ctx *fasthttp.RequestCtx) {
+	// time.Sleep(time.Second)
 	from := ctx.QueryArgs().Peek("from")
 	to := ctx.QueryArgs().Peek("to")
 
@@ -53,7 +54,7 @@ func PaymentsSummary(ctx *fasthttp.RequestCtx) {
 		to = []byte("9999-12-31T23:59:59Z")
 	}
 
-	payments, err := database.GetPaymentHistory(database.MongoClient, string(from), string(to))
+	payments, err := database.GetPaymentsHistoryPostgres(database.PostgresClient, string(from), string(to))
 	if err != nil {
 		fmt.Println("Erro ao buscar histórico de pagamentos:", err)
 		sendJSONResponse(ctx, fasthttp.StatusInternalServerError)
@@ -62,13 +63,13 @@ func PaymentsSummary(ctx *fasthttp.RequestCtx) {
 
 	var typeDetails TypeDetails
 	for _, payment := range payments {
-		switch payment.Type {
+		switch payment["type"] {
 		case "default":
-			typeDetails.Default.TotalRequests++
-			typeDetails.Default.TotalAmount += payment.Amount
+			typeDetails.Default.TotalRequests += payment["totalRequests"].(int)
+			typeDetails.Default.TotalAmount += payment["totalAmount"].(float64)
 		case "fallback":
-			typeDetails.Fallback.TotalRequests++
-			typeDetails.Fallback.TotalAmount += payment.Amount
+			typeDetails.Fallback.TotalRequests += payment["totalRequests"].(int)
+			typeDetails.Fallback.TotalAmount += payment["totalAmount"].(float64)
 		}
 	}
 
@@ -81,13 +82,14 @@ func PaymentsSummary(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	// fmt.Printf("?from=%s&to=%s\n", string(from), string(to))
-	// fmt.Println("Payments Summary:", string(paymentsSummary))
+	fmt.Printf("?from=%s&to=%s\n", string(from), string(to))
+	fmt.Println("Payments Summary:", string(paymentsSummary))
 
 	fmt.Fprintf(ctx, "%s", string(paymentsSummary))
 	sendJSONResponse(ctx, fasthttp.StatusOK)
 }
 
 func PaymentsPurge(ctx *fasthttp.RequestCtx) {
+	database.PurgePaymentsHistoryPostgres(database.PostgresClient)
 	sendJSONResponse(ctx, fasthttp.StatusAccepted)
 }

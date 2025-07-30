@@ -21,7 +21,9 @@ services:
           memory: "15MB"
 
   rinha-api-1:
-    image: jhamiltonjunior/rinha-de-backend-go-mongo:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: rinha-api-1
     environment:
       - RUN_VERIFY_PAYMENT_SERVICE=true
@@ -32,8 +34,7 @@ services:
       - PAYMENT_PROCESSOR_URL_DEFAULT=http://payment-processor-default:8080
       - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
     depends_on:
-      # - redis
-      - mongodb
+      - postgres
     networks:
       - app-network
       - payment-processor
@@ -46,7 +47,9 @@ services:
           memory: "30MB"
 
   rinha-api-2:
-    image: jhamiltonjunior/rinha-de-backend-go-mongo:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: rinha-api-2
     environment:
       - APP_PORT=3000
@@ -56,8 +59,7 @@ services:
       - PAYMENT_PROCESSOR_URL_DEFAULT=http://payment-processor-default:8080
       - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
     depends_on:
-      # - redis
-      - mongodb
+      - postgres
     networks:
       - app-network
       - payment-processor
@@ -70,7 +72,9 @@ services:
           memory: "30MB"
 
   rinha-api-3:
-    image: jhamiltonjunior/rinha-de-backend-go-mongo:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: rinha-api-3
     environment:
       - APP_PORT=3000
@@ -80,8 +84,7 @@ services:
       - PAYMENT_PROCESSOR_URL_DEFAULT=http://payment-processor-default:8080
       - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
     depends_on:
-      # - redis
-      - mongodb
+      - postgres
     networks:
       - app-network
       - payment-processor
@@ -93,41 +96,47 @@ services:
           cpus: "0.25"
           memory: "30MB"
 
-  # redis:
-  #   image: redis:7.2.4-alpine
-  #   container_name: redis_cache
-  #   networks:
-  #     - app-network
-
-  mongodb:
-    image: mongo:latest
-    container_name: mongodb
-    restart: always
-    ports:
-      - "27017:27017"
+  postgres:
+    image: postgres:15
+    container_name: postgres_db
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: very_hard_password
-    volumes:
-      - mongo_data:/data/db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: rinha_de_backend
+    ports:
+      - "5432:5432"
     networks:
       - app-network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./config/sql:/docker-entrypoint-initdb.d
     deploy:
       resources:
         limits:
           cpus: "0.55"
           memory: "245MB"
+    # command: >
+    #   postgres
+    #   -c synchronous_commit=off
+    #   -c wal_writer_delay=200ms
+    #   -c commit_delay=10000
+    #   -c fsync=off
+    #   -c full_page_writes=off
+    #   -c max_wal_size=2GB
+    #   -c checkpoint_timeout=30min
 
-  mongo-express:
-    image: mongo-express:latest
-    container_name: mongo-express
-    restart: always
-    ports:
-      - "5051:8081"
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
     environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: root
-      ME_CONFIG_MONGODB_ADMINPASSWORD: very_hard_password
-      ME_CONFIG_MONGODB_SERVER: mongodb
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
     networks:
       - app-network
 
@@ -138,4 +147,5 @@ networks:
     external: true
 
 volumes:
-  mongo_data:
+  postgres_data:
+  pgadmin_data:

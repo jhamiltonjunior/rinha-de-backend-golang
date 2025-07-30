@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,8 +10,6 @@ import (
 
 	"github.com/jhamiltonjunior/rinha-de-backend/app/database"
 	"github.com/jhamiltonjunior/rinha-de-backend/app/utils"
-	"github.com/redis/go-redis/v9"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type PaymentWorker struct {
@@ -24,7 +23,7 @@ var (
 	SegureOChann2 = make(chan PaymentWorker, 3000)
 )
 
-func InitializeWorker(client *mongo.Client, clientRedis *redis.Client) {
+func InitializeWorker(client *sql.DB) {
 	defaultURL := os.Getenv("PAYMENT_PROCESSOR_URL_DEFAULT")
 	fallbackURL := os.Getenv("PAYMENT_PROCESSOR_URL_FALLBACK")
 	const numWorkers = 20
@@ -34,27 +33,32 @@ func InitializeWorker(client *mongo.Client, clientRedis *redis.Client) {
 	}
 
 	for i := 1; i <= numWorkers; i++ {
-		go retryworkLoop(defaultURL, fallbackURL)
+		go retryworkLoop(defaultURL, fallbackURL, client)
 	}
 }
 
-func workerFunc(client *mongo.Client, defaultURL, fallbackURL string, payment PaymentWorker) bool {
+func workerFunc(client *sql.DB, defaultURL, fallbackURL string, payment PaymentWorker) bool {
 	body, ok := ProcessPayment(payment.Body, payment.VouTeDarOContexto, defaultURL)
+
 	if ok {
-		database.CreatePaymentHistory(client, body, "default")
+		database.CreatePaymentHistoryPostgres(client, body, "default")
 		return true
+	}
+
+	if payment.RetryCount <= 15 {
+		return false
 	}
 
 	body, ok = ProcessPayment(payment.Body, payment.VouTeDarOContexto, fallbackURL)
 	if ok {
-		database.CreatePaymentHistory(client, body, "fallback")
+		database.CreatePaymentHistoryPostgres(client, body, "fallback")
 		return true
 	}
 
 	return false
 }
 
-func workerLoop(client *mongo.Client, defaultURL, fallbackURL string) {
+func workerLoop(client *sql.DB, defaultURL, fallbackURL string) {
 	for payment := range SegureOChann {
 		if !workerFunc(client, defaultURL, fallbackURL, payment) {
 			SegureOChann2 <- PaymentWorker{
@@ -65,9 +69,9 @@ func workerLoop(client *mongo.Client, defaultURL, fallbackURL string) {
 	}
 }
 
-func retryworkLoop(defaultURL, fallbackURL string) {
+func retryworkLoop(defaultURL, fallbackURL string, client *sql.DB) {
 	for payment := range SegureOChann2 {
-		if payment.RetryCount >= 10 {
+		if payment.RetryCount >= 20 {
 			continue
 		}
 
@@ -76,7 +80,7 @@ func retryworkLoop(defaultURL, fallbackURL string) {
 			defer cancel()
 			payment.VouTeDarOContexto = cxt
 
-			if !workerFunc(database.MongoClient, defaultURL, fallbackURL, payment) {
+			if !workerFunc(client, defaultURL, fallbackURL, payment) {
 				payment.RetryCount++
 				SegureOChann2 <- payment
 			}
