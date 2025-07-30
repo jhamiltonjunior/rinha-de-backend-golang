@@ -21,9 +21,18 @@ type TypeDetails struct {
 	Fallback Details `json:"fallback"`
 }
 
+func PaymentsGEt(ctx *fasthttp.RequestCtx) {
+
+	fmt.Println("Received GET request for payments")
+	sendJSONResponse(ctx, fasthttp.StatusAccepted)
+
+}
+
 func Payments(ctx *fasthttp.RequestCtx) {
 	bodyCopy := make([]byte, len(ctx.PostBody()))
 	copy(bodyCopy, ctx.PostBody())
+
+	fmt.Println("Received payment request:", string(bodyCopy))
 
 	cxt, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()

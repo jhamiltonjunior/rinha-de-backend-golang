@@ -1,0 +1,31 @@
+FROM debian:bullseye
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpcre3 libpcre3-dev \
+    zlib1g zlib1g-dev \
+    libssl-dev \
+    curl \
+    wget
+
+# Versão do Nginx
+ENV NGINX_VERSION=1.25.3
+
+WORKDIR /usr/src
+
+# Baixa o código fonte
+RUN wget http://nginx.org/download/nginx-1.25.3.tar.gz && \
+    tar -zxvf nginx-1.25.3.tar.gz
+
+WORKDIR /usr/src/nginx-1.25.3
+
+# Compila o Nginx com mirror
+RUN ./configure \
+    --with-http_ssl_module \
+    --with-http_realip_module \
+    && make && make install
+
+# Expõe a porta 80
+EXPOSE 80
+
+CMD ["/usr/local/nginx/sbin/nginx", "-g", "daemon off;"]

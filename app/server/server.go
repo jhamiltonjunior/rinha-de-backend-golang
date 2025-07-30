@@ -11,6 +11,7 @@ func ListenAndServe(appPort string) {
 	r := router.New()
 
 	r.POST("/payments", handler.Payments)
+	r.GET("/payments", handler.PaymentsGEt)
 	r.GET("/payments-summary", handler.PaymentsSummary)
 	r.POST("/purge-payments", handler.PaymentsPurge)
 
